@@ -67,10 +67,20 @@ class PixelThreshold(EvasionAttack):
         https://arxiv.org/abs/1906.06026
     """
 
-    attack_params = EvasionAttack.attack_params + ["th", "es", "targeted", "verbose"]
-    _estimator_requirements = (BaseEstimator, NeuralNetworkMixin, ClassifierMixin)
+    attack_params = EvasionAttack.attack_params + [
+        "th", "es", "targeted", "verbose"
+    ]
+    _estimator_requirements = (BaseEstimator, NeuralNetworkMixin,
+                               ClassifierMixin)
 
-    def __init__(self, classifier: "Classifier", th: Optional[int], es: int, targeted: bool, verbose: bool,) -> None:
+    def __init__(
+        self,
+        classifier: "Classifier",
+        th: Optional[int],
+        es: int,
+        targeted: bool,
+        verbose: bool,
+    ) -> None:
         """
         Create a :class:`.PixelThreshold` instance.
 
@@ -102,7 +112,8 @@ class PixelThreshold(EvasionAttack):
     def _check_params(self) -> None:
         if self.th is not None:
             if self.th <= 0:
-                raise ValueError("The perturbation size `eps` has to be positive.")
+                raise ValueError(
+                    "The perturbation size `eps` has to be positive.")
         if not isinstance(self.es, int):
             raise ValueError("The flag `es` has to be of type int.")
         if not isinstance(self.targeted, bool):
@@ -110,7 +121,11 @@ class PixelThreshold(EvasionAttack):
         if not isinstance(self.verbose, bool):
             raise ValueError("The flag `verbose` has to be of type bool.")
 
-    def generate(self, x: np.ndarray, y: Optional[np.ndarray] = None, max_iter: int = 100, **kwargs) -> np.ndarray:
+    def generate(self,
+                 x: np.ndarray,
+                 y: Optional[np.ndarray] = None,
+                 max_iter: int = 100,
+                 **kwargs) -> np.ndarray:
         """
         Generate adversarial samples and return them in an array.
 
@@ -122,11 +137,15 @@ class PixelThreshold(EvasionAttack):
         :param max_iter: Maximum number of optimisation iterations.
         :return: An array holding the adversarial examples.
         """
-        y = check_and_transform_label_format(y, self.estimator.nb_classes, return_one_hot=False)
+        y = check_and_transform_label_format(y,
+                                             self.estimator.nb_classes,
+                                             return_one_hot=False)
 
         if y is None:
             if self.targeted:
-                raise ValueError("Target labels `y` need to be provided for a targeted attack.")
+                raise ValueError(
+                    "Target labels `y` need to be provided for a targeted attack."
+                )
             y = np.argmax(self.estimator.predict(x), axis=1)
         else:
             if len(y.shape) > 1:
@@ -146,7 +165,8 @@ class PixelThreshold(EvasionAttack):
                 while True:
                     image_result: Union[List[np.ndarray], np.ndarray] = []
                     threshold = (start + end) // 2
-                    success, trial_image_result = self._attack(image, target_class, threshold, max_iter)
+                    success, trial_image_result = self._attack(
+                        image, target_class, threshold, max_iter)
                     if image_result or success:
                         image_result = trial_image_result
                     if success:
@@ -161,7 +181,8 @@ class PixelThreshold(EvasionAttack):
                             image_result = image
                         break
             else:
-                success, image_result = self._attack(image, target_class, self.th, max_iter)
+                success, image_result = self._attack(image, target_class,
+                                                     self.th, max_iter)
             adv_x_best += [image_result]
 
         adv_x_best = np.array(adv_x_best)
@@ -173,7 +194,9 @@ class PixelThreshold(EvasionAttack):
             y = to_categorical(y, self.estimator.nb_classes)
 
         logger.info(
-            "Success rate of Attack: %.2f%%", 100 * compute_success(self.estimator, x, y, adv_x_best, self.targeted, 1),
+            "Success rate of Attack: %.2f%%",
+            100 * compute_success(self.estimator, x, y, adv_x_best,
+                                  self.targeted, 1),
         )
         return adv_x_best
 
@@ -181,13 +204,14 @@ class PixelThreshold(EvasionAttack):
         """
         Define the bounds for the image `img` within the limits `limit`.
         """
-
         def bound_limit(value):
-            return np.clip(value - limit, 0, 255), np.clip(value + limit, 0, 255)
+            return np.clip(value - limit, 0,
+                           255), np.clip(value + limit, 0, 255)
 
         minbounds, maxbounds, bounds, initial = [], [], [], []
 
-        for i, j, k in product(range(img.shape[-3]), range(img.shape[-2]), range(img.shape[-1])):
+        for i, j, k in product(range(img.shape[-3]), range(img.shape[-2]),
+                               range(img.shape[-1])):
             temp = img[i, j, k]
             initial += [temp]
             bound = bound_limit(temp)
@@ -211,15 +235,13 @@ class PixelThreshold(EvasionAttack):
         """
         Checks whether the given perturbation `adv_x` for the image `img` is successful.
         """
-        predicted_class = np.argmax(self.estimator.predict(self._perturb_image(adv_x, x))[0])
-        return bool(
-            (self.targeted and predicted_class == target_class)
-            or (not self.targeted and predicted_class != target_class)
-        )
+        predicted_class = np.argmax(
+            self.estimator.predict(self._perturb_image(adv_x, x))[0])
+        return bool((self.targeted and predicted_class == target_class)
+                    or (not self.targeted and predicted_class != target_class))
 
-    def _attack(
-        self, image: np.ndarray, target_class: np.ndarray, limit: int, max_iter: int
-    ) -> Tuple[bool, np.ndarray]:
+    def _attack(self, image: np.ndarray, target_class: np.ndarray, limit: int,
+                max_iter: int) -> Tuple[bool, np.ndarray]:
         """
         Attack the given image `image` with the threshold `limit` for the `target_class` which is true label for
         untargeted attack and targeted label for targeted attack.
@@ -227,13 +249,15 @@ class PixelThreshold(EvasionAttack):
         bounds, initial = self._get_bounds(image, limit)
 
         def predict_fn(x):
-            predictions = self.estimator.predict(self._perturb_image(x, image))[:, target_class]
+            predictions = self.estimator.predict(self._perturb_image(
+                x, image))[:, target_class]
             return predictions if not self.targeted else 1 - predictions
 
         def callback_fn(x, convergence=None):
             if self.es == 0:
                 if self._attack_success(x.result[0], image, target_class):
-                    raise Exception("Attack Completed :) Earlier than expected")
+                    raise Exception(
+                        "Attack Completed :) Earlier than expected")
             else:
                 return self._attack_success(x, image, target_class)
 
@@ -263,7 +287,7 @@ class PixelThreshold(EvasionAttack):
                     predict_fn,
                     maxfun=max(1, 400 // len(bounds)) * len(bounds) * 100,
                     callback=callback_fn,
-                    iterations=1,
+                    iterations=maxiter,
                 )
             except Exception as exception:
                 if self.verbose:
@@ -301,7 +325,6 @@ class PixelAttack(PixelThreshold):
     | Pixel Attack Paper link:
         https://arxiv.org/abs/1906.06026
     """
-
     def __init__(
         self,
         classifier: "Classifier",
@@ -319,7 +342,8 @@ class PixelAttack(PixelThreshold):
         :param targeted: Indicates whether the attack is targeted (True) or untargeted (False).
         :param verbose: Indicates whether to print verbose messages of ES used.
         """
-        super(PixelAttack, self).__init__(classifier, th, es, targeted, verbose)
+        super(PixelAttack, self).__init__(classifier, th, es, targeted,
+                                          verbose)
         self.type_attack = 0
 
     def _perturb_image(self, x: np.ndarray, img: np.ndarray) -> np.ndarray:
@@ -336,7 +360,8 @@ class PixelAttack(PixelThreshold):
                 if not self.estimator.channels_first:
                     image[x_pos % self.img_rows, y_pos % self.img_cols] = rgb
                 else:
-                    image[:, x_pos % self.img_rows, y_pos % self.img_cols] = rgb
+                    image[:, x_pos % self.img_rows,
+                          y_pos % self.img_cols] = rgb
         return imgs
 
     def _get_bounds(self, img: np.ndarray, limit) -> Tuple[List[list], list]:
@@ -346,7 +371,8 @@ class PixelAttack(PixelThreshold):
         initial: List[np.ndarray] = []
         bounds: List[List[int]]
         if self.es == 0:
-            for count, (i, j) in enumerate(product(range(self.img_rows), range(self.img_cols))):
+            for count, (i, j) in enumerate(
+                    product(range(self.img_rows), range(self.img_cols))):
                 initial += [i, j]
                 for k in range(self.img_channels):
                     if not self.estimator.channels_first:
@@ -382,7 +408,6 @@ class ThresholdAttack(PixelThreshold):
     | Paper link:
         https://arxiv.org/abs/1906.06026
     """
-
     def __init__(
         self,
         classifier: "Classifier",
@@ -400,7 +425,8 @@ class ThresholdAttack(PixelThreshold):
         :param targeted: Indicates whether the attack is targeted (True) or untargeted (False).
         :param verbose: Indicates whether to print verbose messages of ES used.
         """
-        super(ThresholdAttack, self).__init__(classifier, th, es, targeted, verbose)
+        super(ThresholdAttack, self).__init__(classifier, th, es, targeted,
+                                              verbose)
         self.type_attack = 1
 
     def _perturb_image(self, x: np.ndarray, img: np.ndarray) -> np.ndarray:
@@ -413,15 +439,17 @@ class ThresholdAttack(PixelThreshold):
         x = x.astype(int)
         for adv, image in zip(x, imgs):
             for count, (i, j, k) in enumerate(
-                product(range(image.shape[-3]), range(image.shape[-2]), range(image.shape[-1]),)
-            ):
+                    product(
+                        range(image.shape[-3]),
+                        range(image.shape[-2]),
+                        range(image.shape[-1]),
+                    )):
                 image[i, j, k] = adv[count]
         return imgs
 
 
 # TODO: Make the attack compatible with current version of SciPy Optimize
 # Differential Evolution
-
 """
 A slight modification to Scipy's implementation of differential evolution.
 To speed up predictions, the entire parameters array is passed to `self.func`,
@@ -893,11 +921,9 @@ class DifferentialEvolutionSolver:
         "rand2exp": "_rand2",
     }
 
-    __init_error_msg = (
-        "The population initialization method must be one of "
-        "'latinhypercube' or 'random', or an array of shape "
-        "(M, N) where N is the number of parameters and M>5"
-    )
+    __init_error_msg = ("The population initialization method must be one of "
+                        "'latinhypercube' or 'random', or an array of shape "
+                        "(M, N) where N is the number of parameters and M>5")
 
     def __init__(
         self,
@@ -936,12 +962,11 @@ class DifferentialEvolutionSolver:
         # Mutation constant should be in [0, 2). If specified as a sequence
         # then dithering is performed.
         self.scale = mutation
-        if not np.all(np.isfinite(mutation)) or np.any(np.array(mutation) >= 2) or np.any(np.array(mutation) < 0):
-            raise ValueError(
-                "The mutation constant must be a float in "
-                "U[0, 2), or specified as a tuple(min, max)"
-                " where min < max and min, max are in U[0, 2)."
-            )
+        if not np.all(np.isfinite(mutation)) or np.any(
+                np.array(mutation) >= 2) or np.any(np.array(mutation) < 0):
+            raise ValueError("The mutation constant must be a float in "
+                             "U[0, 2), or specified as a tuple(min, max)"
+                             " where min < max and min, max are in U[0, 2).")
 
         self.dither = None
         if hasattr(mutation, "__iter__") and len(mutation) > 1:
@@ -957,10 +982,11 @@ class DifferentialEvolutionSolver:
         # [(low_0, high_0), ..., (low_n, high_n]
         #     -> [[low_0, ..., low_n], [high_0, ..., high_n]]
         self.limits = np.array(bounds, dtype="float").T
-        if np.size(self.limits, 0) != 2 or not np.all(np.isfinite(self.limits)):
-            raise ValueError(
-                "bounds should be a sequence containing " "real valued (min, max) pairs for each value" " in x"
-            )
+        if np.size(self.limits, 0) != 2 or not np.all(np.isfinite(
+                self.limits)):
+            raise ValueError("bounds should be a sequence containing "
+                             "real valued (min, max) pairs for each value"
+                             " in x")
 
         if maxiter is None:  # the default used to be None
             maxiter = 1000
@@ -986,7 +1012,8 @@ class DifferentialEvolutionSolver:
         # least 5 long
         self.num_population_members = max(5, popsize * self.parameter_count)
 
-        self.population_shape = (self.num_population_members, self.parameter_count)
+        self.population_shape = (self.num_population_members,
+                                 self.parameter_count)
 
         self._nfev = 0
         if isinstance(init, string_types):
@@ -1021,8 +1048,9 @@ class DifferentialEvolutionSolver:
             segsize * rng.random_sample(self.population_shape)
             # Offset each segment to cover the entire parameter range
             # [0, 1)
-            + np.linspace(0.0, 1.0, self.num_population_members, endpoint=False)[:, np.newaxis]
-        )
+            +
+            np.linspace(0.0, 1.0, self.num_population_members,
+                        endpoint=False)[:, np.newaxis])
 
         # Create an array for population of candidate solutions.
         self.population = np.zeros_like(samples)
@@ -1034,7 +1062,8 @@ class DifferentialEvolutionSolver:
             self.population[:, j] = samples[order, j]
 
         # reset population energies
-        self.population_energies = np.ones(self.num_population_members) * np.inf
+        self.population_energies = np.ones(
+            self.num_population_members) * np.inf
 
         # reset number of function evaluations counter
         self._nfev = 0
@@ -1048,7 +1077,8 @@ class DifferentialEvolutionSolver:
         self.population = rng.random_sample(self.population_shape)
 
         # reset population energies
-        self.population_energies = np.ones(self.num_population_members) * np.inf
+        self.population_energies = np.ones(
+            self.num_population_members) * np.inf
 
         # reset number of function evaluations counter
         self._nfev = 0
@@ -1066,18 +1096,23 @@ class DifferentialEvolutionSolver:
         # make sure you're using a float array
         popn = np.asfarray(init)
 
-        if np.size(popn, 0) < 5 or popn.shape[1] != self.parameter_count or len(popn.shape) != 2:
-            raise ValueError("The population supplied needs to have shape" " (M, len(x)), where M > 4.")
+        if np.size(popn,
+                   0) < 5 or popn.shape[1] != self.parameter_count or len(
+                       popn.shape) != 2:
+            raise ValueError("The population supplied needs to have shape"
+                             " (M, len(x)), where M > 4.")
 
         # scale values and clip to bounds, assigning to population
         self.population = np.clip(self._unscale_parameters(popn), 0, 1)
 
         self.num_population_members = np.size(self.population, 0)
 
-        self.population_shape = (self.num_population_members, self.parameter_count)
+        self.population_shape = (self.num_population_members,
+                                 self.parameter_count)
 
         # reset population energies
-        self.population_energies = np.ones(self.num_population_members) * np.inf
+        self.population_energies = np.ones(
+            self.num_population_members) * np.inf
 
         # reset number of function evaluations counter
         self._nfev = 0
@@ -1099,7 +1134,8 @@ class DifferentialEvolutionSolver:
         The standard deviation of the population energies divided by their
         mean.
         """
-        return np.std(self.population_energies) / np.abs(np.mean(self.population_energies) + _MACHEPS)
+        return np.std(self.population_energies) / np.abs(
+            np.mean(self.population_energies) + _MACHEPS)
 
     def solve(self):
         """
@@ -1137,21 +1173,23 @@ class DifferentialEvolutionSolver:
                 break
 
             if self.disp:
-                print("differential_evolution step %d: f(x)= %g" % (nit, self.population_energies[0]))
+                print("differential_evolution step %d: f(x)= %g" %
+                      (nit, self.population_energies[0]))
 
             # should the solver terminate?
             convergence = self.convergence
 
-            if (
-                self.callback
-                and self.callback(self._scale_parameters(self.population[0]), convergence=self.tol / convergence,)
-                is True
-            ):
+            if (self.callback and self.callback(
+                    self._scale_parameters(self.population[0]),
+                    convergence=self.tol / convergence,
+            ) is True):
                 warning_flag = True
                 status_message = "callback function requested stop early " "by returning True"
                 break
 
-            intol = np.std(self.population_energies) <= self.atol + self.tol * np.abs(np.mean(self.population_energies))
+            intol = np.std(
+                self.population_energies) <= self.atol + self.tol * np.abs(
+                    np.mean(self.population_energies))
             if warning_flag or intol:
                 break
 
@@ -1169,7 +1207,13 @@ class DifferentialEvolutionSolver:
         )
 
         if self.polish:
-            result = minimize(self.func, np.copy(de_result.x), method="L-BFGS-B", bounds=self.limits.T, args=self.args,)
+            result = minimize(
+                self.func,
+                np.copy(de_result.x),
+                method="L-BFGS-B",
+                bounds=self.limits.T,
+                args=self.args,
+            )
 
             self._nfev += result.nfev
             de_result.nfev = self._nfev
@@ -1194,9 +1238,11 @@ class DifferentialEvolutionSolver:
         ##############
         # CHANGES: self.func operates on the entire parameters array
         ##############
-        itersize = max(0, min(len(self.population), self.maxfun - self._nfev + 1))
+        itersize = max(0,
+                       min(len(self.population), self.maxfun - self._nfev + 1))
         candidates = self.population[:itersize]
-        parameters = np.array([self._scale_parameters(c) for c in candidates])  # TODO: can be vectorized
+        parameters = np.array([self._scale_parameters(c)
+                               for c in candidates])  # TODO: can be vectorized
         energies = self.func(parameters, *self.args)
         self.population_energies = energies
         self._nfev += itersize
@@ -1241,17 +1287,21 @@ class DifferentialEvolutionSolver:
             self._calculate_population_energies()
 
         if self.dither is not None:
-            self.scale = self.random_number_generator.rand() * (self.dither[1] - self.dither[0]) + self.dither[0]
+            self.scale = self.random_number_generator.rand() * (
+                self.dither[1] - self.dither[0]) + self.dither[0]
 
         ##############
         # CHANGES: self.func operates on the entire parameters array
         ##############
 
-        itersize = max(0, min(self.num_population_members, self.maxfun - self._nfev + 1))
-        trials = np.array([self._mutate(c) for c in range(itersize)])  # TODO:can be vectorized
+        itersize = max(
+            0, min(self.num_population_members, self.maxfun - self._nfev + 1))
+        trials = np.array([self._mutate(c)
+                           for c in range(itersize)])  # TODO:can be vectorized
         for trial in trials:
             self._ensure_constraint(trial)
-        parameters = np.array([self._scale_parameters(trial) for trial in trials])
+        parameters = np.array(
+            [self._scale_parameters(trial) for trial in trials])
         energies = self.func(parameters, *self.args)
         self._nfev += itersize
 
@@ -1345,7 +1395,8 @@ class DifferentialEvolutionSolver:
         fill_point = rng.randint(0, self.parameter_count)
 
         if self.strategy in ["currenttobest1exp", "currenttobest1bin"]:
-            bprime = self.mutation_func(candidate, self._select_samples(candidate, 5))
+            bprime = self.mutation_func(candidate,
+                                        self._select_samples(candidate, 5))
         else:
             bprime = self.mutation_func(self._select_samples(candidate, 5))
 
@@ -1362,7 +1413,8 @@ class DifferentialEvolutionSolver:
 
         elif self.strategy in self._exponential:
             i = 0
-            while i < self.parameter_count and rng.rand() < self.cross_over_probability:
+            while i < self.parameter_count and rng.rand(
+            ) < self.cross_over_probability:
                 trial[fill_point] = bprime[fill_point]
                 fill_point = (fill_point + 1) % self.parameter_count
                 i += 1
@@ -1374,14 +1426,16 @@ class DifferentialEvolutionSolver:
         best1bin, best1exp
         """
         r0, r1 = samples[:2]
-        return self.population[0] + self.scale * (self.population[r0] - self.population[r1])
+        return self.population[0] + self.scale * (self.population[r0] -
+                                                  self.population[r1])
 
     def _rand1(self, samples):
         """
         rand1bin, rand1exp
         """
         r0, r1, r2 = samples[:3]
-        return self.population[r0] + self.scale * (self.population[r1] - self.population[r2])
+        return self.population[r0] + self.scale * (self.population[r1] -
+                                                   self.population[r2])
 
     def _randtobest1(self, samples):
         """
@@ -1399,8 +1453,8 @@ class DifferentialEvolutionSolver:
         """
         r0, r1 = samples[:2]
         bprime = self.population[candidate] + self.scale * (
-            self.population[0] - self.population[candidate] + self.population[r0] - self.population[r1]
-        )
+            self.population[0] - self.population[candidate] +
+            self.population[r0] - self.population[r1])
         return bprime
 
     def _best2(self, samples):
@@ -1409,8 +1463,8 @@ class DifferentialEvolutionSolver:
         """
         r0, r1, r2, r3 = samples[:4]
         bprime = self.population[0] + self.scale * (
-            self.population[r0] + self.population[r1] - self.population[r2] - self.population[r3]
-        )
+            self.population[r0] + self.population[r1] - self.population[r2] -
+            self.population[r3])
 
         return bprime
 
@@ -1420,8 +1474,8 @@ class DifferentialEvolutionSolver:
         """
         r0, r1, r2, r3, r4 = samples
         bprime = self.population[r0] + self.scale * (
-            self.population[r1] + self.population[r2] - self.population[r3] - self.population[r4]
-        )
+            self.population[r1] + self.population[r2] - self.population[r3] -
+            self.population[r4])
 
         return bprime
 
